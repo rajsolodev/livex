@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Live X aka Twitter Feed 🐦</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeInSlide {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeInSlide {
+      animation: fadeInSlide 0.4s ease-in-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-black text-white min-h-screen">
+
+  <div class="flex max-w-7xl mx-auto">
+
+    <!-- Left Column: Sidebar -->
+    <div class="w-1/5 border-r border-gray-800 p-4 space-y-4">
+      <h2 class="text-xl font-bold mb-4">Menu</h2>
+      <ul class="space-y-2">
+        <li class="hover:text-sky-500 cursor-pointer transition">🏠 Home</li>
+        <li class="hover:text-sky-500 cursor-pointer transition">👤 Account</li>
+      </ul>
+    </div>
+
+    <!-- Middle Column: Feed -->
+    <div class="flex-1 border-x border-gray-800 p-4 space-y-4">
+
+      <!-- Feed header -->
+      <div class="border-b border-gray-800 pb-2 mb-4">
+        <h1 class="text-xl font-bold text-white flex items-center space-x-2">
+          <span class="text-sky-500 text-2xl">🐦</span>
+          <span>Live X aka Twitter Feed</span>
+        </h1>
+      </div>
+
+      <!-- Create Post Form -->
+      <div class="border-b border-gray-800 pb-4">
+        <form method="post">
+          {% csrf_token %}
+          <textarea 
+            name="content" 
+            placeholder="What’s happening?" 
+            class="w-full bg-transparent text-gray-200 text-lg resize-none outline-none border-none placeholder-gray-500"
+            rows="3"></textarea>
+          <div class="flex justify-end mt-2">
+            <button 
+              type="submit"
+              class="bg-sky-500 hover:bg-sky-600 text-white font-semibold px-4 py-1.5 rounded-full transition">
+              Post
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Posts Feed -->
+      <div id="feed" class="space-y-2">
+        {% for post in posts %}
+        <div class="border-b border-gray-800 p-4 flex space-x-3 hover:bg-white/5 transition animate-fadeInSlide">
+          <div class="w-10 h-10 rounded-full bg-sky-600 flex items-center justify-center font-semibold">
+            {{ post.display_user|slice:":1"|upper }}
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-semibold">{{ post.display_user }}</span>
+              <span class="text-gray-500 text-sm">@{{ post.display_user|lower|cut:" " }}</span>
+              <span class="text-gray-600 text-sm">· just now</span>
+            </div>
+            <p class="text-gray-200 mt-1 leading-relaxed">{{ post.content }}</p>
+            <div class="flex justify-between text-gray-500 mt-3 max-w-sm text-sm">
+              <button class="hover:text-sky-400 transition">💬 0</button>
+              <button class="hover:text-green-500 transition">🔁 0</button>
+              <button class="hover:text-pink-500 transition">❤️ 0</button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+
+    <!-- Right Column: Trending -->
+    <div class="w-1/5 border-l border-gray-800 p-4 space-y-4">
+      <h2 class="text-xl font-bold mb-4">🔥 Trending</h2>
+      <div id="trending" class="text-gray-200 hidden animate-fadeInSlide">
+        <!-- Latest trending will appear here -->
+      </div>
+    </div>
+
+  </div>
+<script>
+  const feed = document.getElementById("feed");
+  const trending = document.getElementById("trending");
+  const socket = new WebSocket("ws://localhost:8000/ws/feed/");
+  socket.onopen = () => console.log("WebSocket connected");
+  socket.onerror = (e) => console.error("WebSocket error:", e);
+  socket.onmessage = function(e){
+    const data = JSON.parse(e.data)
+    const content = data.content || data.message
+    const postType = data.post_type || "normal"
+    const username = data.username || "Guest"
+    const initial = username.slice(0, 1).toUpperCase();
+
+    if(postType === "trending"){
+      trending.classList.remove("hidden");
+      const postDiv = document.createElement("div");
+      postDiv.className = "bg-yellow-900/20 p-3 rounded border border-yellow-500 mb-2 animate-fadeInSlide";
+      postDiv.innerHTML = `
+        <span class="font-semibold text-yellow-300">🔥 Trending ${data.rank || ""}</span>
+        <p class="text-yellow-200 mt-1">${content}</p>`;
+      trending.appendChild(postDiv);
+
+      while (trending.children.length > 3) {
+        trending.removeChild(trending.firstChild); // remove the oldest
+    }
+
+
+    } else {
+    const postDiv = document.createElement("div");
+    postDiv.className = "border-b border-gray-800 p-4 flex space-x-3 hover:bg-white/5 transition animate-fadeInSlide";
+    postDiv.innerHTML = `
+          <div class="w-10 h-10 rounded-full bg-sky-600 flex items-center justify-center font-semibold">${initial}</div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-semibold">${username}</span>
+              <span class="text-gray-500 text-sm">@${username.replace(/\s+/g, '').toLowerCase()}</span>
+              <span class="text-gray-600 text-sm">· now</span>
+            </div>
+            <p class="text-gray-200 mt-1 leading-relaxed">${content}</p>
+            <div class="flex justify-between text-gray-500 mt-3 max-w-sm text-sm">
+              <button class="hover:text-sky-400 transition">💬 0</button>
+              <button class="hover:text-green-500 transition">🔁 0</button>
+              <button class="hover:text-pink-500 transition">❤️ 0</button>
+            </div>
+          </div>
+        `;
+        feed.prepend(postDiv);
+    }    
+  }
+</script>
+</body>
+</html>

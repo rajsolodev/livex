@@ -1,0 +1,67 @@
+services:
+  redis:
+    image: redis:8.2-bookworm
+    container_name: redis_con
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6379:6379"
+    env_file:
+      - .env
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
+    restart: always
+
+  django_project:
+    container_name: django_con
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: django-img
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/livex
+      - /livex/.venv 
+    depends_on:
+      - redis
+    command: >
+      bash -c "
+      uv run manage.py makemigrations &&
+      uv run manage.py migrate &&
+      uv run manage.py collectstatic --noinput &&
+      uv run uvicorn livex.asgi:application --host 0.0.0.0 --port 8000 --reload --reload-dir /livex --reload-include '*.html' --reload-include '*.css' --reload-include '*.js' --reload-exclude /livex/.venv"
+    restart: always
+
+  celery_worker:
+    container_name: celery_con
+    image: django-img
+    env_file:
+      - .env
+    command: uv run celery -A livex worker -l info
+    depends_on:
+      - redis
+      - django_project
+    volumes:
+      - .:/livex
+      - /livex/.venv 
+    restart: unless-stopped
+
+  celery_beat:
+    container_name: celery_beat_con
+    image: django-img
+    env_file:
+      - .env
+    command: uv run celery -A livex beat -l info
+    depends_on:
+      - redis
+      - django_project
+    volumes:
+      - .:/livex
+      - /livex/.venv 
+    restart: unless-stopped
+
+volumes:
+  redis_data:

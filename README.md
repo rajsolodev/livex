@@ -38,11 +38,3 @@ This project demonstrates the integration of  **Uvicorn** ,  **Django** ,  **Cel
 | `docker compose -f docker-compose.yml start`                                       | Restarts previously stopped containers without rebuilding or re-creating them.                                  |
 | `docker compose -f docker-compose.yml down`                                        | Stops and removes all containers, networks, and temporary volumes created by the compose project.               |
 | `docker exec -it redis_con redis-cli -u redis://rajesh:Hello123456@127.0.0.1:6379` | Opens an interactive shell inside the `redis_con` container.                                                  |
-
----
-
----
-
----
-
----
